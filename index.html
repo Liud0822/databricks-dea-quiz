@@ -211,10 +211,37 @@
   var PASS_LINE = 70;
 
   var LS = { theme:"dea_theme", hist:"dea_v2_history", wrong:"dea_v2_wrong", stats:"dea_v2_stats", attempts:"dea_v2_attempts", user:"dea_user", mark:"dea_v2_mark" };
-  function lsGet(k, def){ try{ var v=localStorage.getItem(k); return v==null?def:JSON.parse(v); }catch(e){ return def; } }
-  function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-  function lsGetRaw(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-  function lsSetRaw(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  // ---- storage backend: メモリキャッシュ + ローカルAPI(quiz.sqlite) / localStorage フォールバック ----
+  var STORE = {};          // key -> 生JSON文字列（localStorage と同じ形）
+  var API_OK = false;      // ローカルサーバ(serve.py)の API が使えるか
+  var API_BASE = "/api";
+  // 起動時：まず localStorage から同期シード（サーバ無し=file:// でも即動く／既存記録もここで拾う）
+  try{ for(var _i=0;_i<localStorage.length;_i++){ var _k=localStorage.key(_i); STORE[_k]=localStorage.getItem(_k); } }catch(e){}
+  function lsGetRaw(k){ return (k in STORE) ? STORE[k] : null; }
+  function lsSetRaw(k,v){
+    STORE[k]=v;
+    try{ localStorage.setItem(k,v); }catch(e){}   // 常にミラー（フォールバック用）
+    if(API_OK){ try{ fetch(API_BASE+"/set",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:k,value:v})}); }catch(e){} }
+  }
+  function lsGet(k, def){ var v=lsGetRaw(k); if(v==null) return def; try{ return JSON.parse(v); }catch(e){ return def; } }
+  function lsSet(k, v){ lsSetRaw(k, JSON.stringify(v)); }
+  // サーバから全状態を取得しサーバを正とする。localStorage にしか無いキーはサーバへ移行（初回のみ実質発生）。
+  function apiLoad(done){
+    var finish=function(){ try{ done&&done(); }catch(e){} };
+    try{
+      fetch(API_BASE+"/state").then(function(r){ return r.ok?r.json():Promise.reject(); }).then(function(server){
+        API_OK=true; server=server||{};
+        Object.keys(STORE).forEach(function(k){ if(!(k in server)){ try{ fetch(API_BASE+"/set",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:k,value:STORE[k]})}); }catch(e){} server[k]=STORE[k]; } });
+        Object.keys(server).forEach(function(k){ STORE[k]=server[k]; try{ localStorage.setItem(k,server[k]); }catch(e){} });
+        finish();
+      }).catch(function(){ API_OK=false; finish(); });
+    }catch(e){ API_OK=false; finish(); }
+  }
+  // 全記録を JSON で書き出し（バックアップ / localhost版への移行用）
+  function exportState(){
+    var obj={}; Object.keys(STORE).forEach(function(k){ if(k.indexOf("dea_")===0 && STORE[k]!=null) obj[k]=STORE[k]; });
+    download("dea_state.json", JSON.stringify(obj,null,2));
+  }
 
   // ---- theme ----
   var themeBtn = document.getElementById("themeBtn");
@@ -364,6 +391,7 @@
         '<button class="ghost review" id="listBtn">▤ 問題一覧・成績</button>'+
         '<button class="ghost" id="exportBtn">⇩ データ書き出し（分析用）</button>'+
         '<button class="ghost" id="dailyBtn">⇩ 今日の受験CSV（DB取込用）</button>'+
+        '<button class="ghost" id="backupBtn">⇩ 記録をJSON保存（バックアップ/移行）</button>'+
         (attempts||seenCount?'<button class="ghost warn" id="clearBtn">成績をクリア</button>':'')+
       '</div>'+
       '<div class="count-note" style="margin-top:10px">CSVの利用者名（principal）：'+
@@ -425,6 +453,7 @@
     document.getElementById("listBtn").addEventListener("click", function(){ listFilter="all"; renderList(); });
     document.getElementById("exportBtn").addEventListener("click", exportData);
     var _db=document.getElementById("dailyBtn"); if(_db) _db.addEventListener("click", exportDailyCsv);
+    var _bk=document.getElementById("backupBtn"); if(_bk) _bk.addEventListener("click", exportState);
     var _ui=document.getElementById("userInput"); if(_ui) _ui.addEventListener("change", function(e){ lsSetRaw(LS.user, e.target.value.trim()); });
     var cb=document.getElementById("clearBtn");
     if(cb) cb.addEventListener("click", function(){
@@ -514,27 +543,36 @@
   function beginQuiz(list, source){
     if(!list.length) return;
     var sid = "app-"+Date.now()+"-"+Math.floor(Math.random()*1000);
-    quiz={ list:list, idx:0, answers:new Array(list.length).fill(null), mode:settings.mode, source:source, session:sid };
+    quiz={ list:list, idx:0, answers:new Array(list.length).fill(null), mode:settings.mode, source:source, session:sid, order:{} };
     renderQ(); window.scrollTo(0,0);
   }
   function startQuiz(){ beginQuiz(filteredList(), "practice"); }
   function startWrongReview(){ var ids=wrongIds(); if(!ids.length) return; beginQuiz(orderList(ids.map(byId)), "wrong"); }
   function startMarkReview(){ var ids=markIds(); if(!ids.length) return; beginQuiz(orderList(ids.map(byId)), "mark"); }
+  function optOrder(i){
+    if(!quiz.order[i]){
+      var n=quiz.list[i].options.length, a=[]; for(var j=0;j<n;j++) a.push(j);
+      for(var k=n-1;k>0;k--){ var r=Math.floor(Math.random()*(k+1)); var t=a[k];a[k]=a[r];a[r]=t; }
+      quiz.order[i]=a;
+    }
+    return quiz.order[i];
+  }
 
   function renderQ(){
     var q=quiz.list[quiz.idx], total=quiz.list.length, sel=quiz.answers[quiz.idx];
     var answered=sel!==null, showFeedback=quiz.mode==="practice"&&answered, keys="ABCDEF";
 
-    var optsHtml=q.options.map(function(opt,i){
+    var order=optOrder(quiz.idx);
+    var optsHtml=order.map(function(origI, dispI){
       var cls="opt";
-      if(showFeedback){ if(i===q.answer) cls+=" correct"; else if(i===sel) cls+=" wrong"; }
-      else if(i===sel) cls+=" selected";
-      return '<button class="'+cls+'" data-i="'+i+'" '+(showFeedback?"disabled":"")+'><span class="k">'+keys[i]+'</span><span>'+esc(opt)+'</span></button>';
+      if(showFeedback){ if(origI===q.answer) cls+=" correct"; else if(origI===sel) cls+=" wrong"; }
+      else if(origI===sel) cls+=" selected";
+      return '<button class="'+cls+'" data-i="'+origI+'" '+(showFeedback?"disabled":"")+'><span class="k">'+keys[dispI]+'</span><span>'+esc(q.options[origI])+'</span></button>';
     }).join("");
 
     var expHtml="";
     if(showFeedback){ var ok=sel===q.answer;
-      expHtml='<div class="explain show"><div class="verdict '+(ok?"ok":"ng")+'">'+(ok?"◯ 正解":"✕ 不正解")+'（正解：'+keys[q.answer]+'）</div>'+esc(q.explanation)+
+      expHtml='<div class="explain show"><div class="verdict '+(ok?"ok":"ng")+'">'+(ok?"◯ 正解":"✕ 不正解")+'（正解：'+keys[order.indexOf(q.answer)]+'）</div>'+esc(q.explanation)+
         (q.concept?('<div class="concept"><span class="concept-label">📘 用語・ポイント</span>'+esc(q.concept)+'</div>'):'')+'</div>'; }
 
     var pct=Math.round(quiz.idx/total*100), isLast=quiz.idx===total-1;
@@ -568,7 +606,7 @@
   document.addEventListener("keydown", function(e){
     if(!quiz) return;
     if(/^[1-6]$/.test(e.key)){ var i=parseInt(e.key,10)-1; var q=quiz.list[quiz.idx];
-      if(i<q.options.length){ var locked=quiz.mode==="practice"&&quiz.answers[quiz.idx]!==null; if(!locked) selectOption(i); } }
+      if(i<q.options.length){ var locked=quiz.mode==="practice"&&quiz.answers[quiz.idx]!==null; if(!locked){ var _od=optOrder(quiz.idx); selectOption(_od[i]); } } }
     else if(e.key==="Enter"){ if(canAdvance()) advance(); }
     else if(e.key==="m"||e.key==="M"){ toggleMark(quiz.list[quiz.idx].id); renderQ(); }
     else if(e.key==="ArrowLeft"){ if(quiz.idx>0){quiz.idx--;renderQ();} }
@@ -621,10 +659,11 @@
     var reviewHtml=list.map(function(q,i){
       var ok=ans[i]===q.answer; if(!ok) wrongCount++;
       var mkBadge=isMarked(q.id)?' <span class="tag mk">🚩 マーク</span>':'';
-      var your=ans[i]===null?"（未回答）":keys[ans[i]]+". "+q.options[ans[i]];
+      var _o=quiz.order&&quiz.order[i]; var _dl=function(oi){ if(oi==null)return ""; var p=_o?_o.indexOf(oi):-1; return keys[p<0?oi:p]; };
+      var your=ans[i]===null?"（未回答）":_dl(ans[i])+". "+q.options[ans[i]];
       return '<div class="review-item'+(ok?'':' ng')+'"><div class="q">'+(ok?"◯":"✕")+' #'+q.id+mkBadge+'　'+esc(q.question)+'</div>'+
         (ok?'':'<div class="review-line your"><span class="lab">あなた</span><span>'+esc(your)+'</span></div>')+
-        '<div class="review-line ans"><span class="lab">正解</span><span>'+keys[q.answer]+'. '+esc(q.options[q.answer])+'</span></div>'+
+        '<div class="review-line ans"><span class="lab">正解</span><span>'+_dl(q.answer)+'. '+esc(q.options[q.answer])+'</span></div>'+
         '<div class="review-exp">'+esc(q.explanation)+
         (q.concept?('<div class="concept"><span class="concept-label">📘 用語・ポイント</span>'+esc(q.concept)+'</div>'):'')+'</div></div>';
     }).join("");
@@ -653,7 +692,7 @@
     window.scrollTo(0,0);
   }
 
-  renderStart();
+  apiLoad(function(){ renderStart(); });
 })();
 </script>
 </body>

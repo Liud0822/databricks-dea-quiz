@@ -44,7 +44,7 @@ window.QUESTION_BANK = [
       "CREATE DATABASE customer360 DELTA LOCATION '/customer/customer360';"
     ],
     answer: 2,
-    explanation: "既存でもエラーにしないため IF NOT EXISTS、指定パスに作るため LOCATION 句が必要。CREATE DATABASE 構文に DELTA というキーワードは存在しない。A は IF NOT EXISTS が無く既存だと失敗、B は LOCATION が無い。",
+    explanation: "既存でもエラーにしないため IF NOT EXISTS、指定パスに作るため LOCATION 句が必要。CREATE DATABASE 構文に DELTA というキーワードは存在しない。IF NOT EXISTS が無い版は既存だと失敗し、LOCATION が無い版は指定パスに作れない。",
     concept: "DATABASE と SCHEMA は Databricks では同義語。IF NOT EXISTS は「無ければ作る」冪等な作成句で、重複作成のエラーを防ぐ。LOCATION はデータの格納場所を指定する句（省略時は所属カタログ/スキーマのマネージドロケーション）。Delta は既定のテーブル形式であり、DATABASE 作成構文にキーワードとしては現れない。"
   },
   {
@@ -929,7 +929,7 @@ window.QUESTION_BANK = [
       ".writeStream.option('checkpoint', '/ckpt').trigger(batch=True).table('t')"
     ],
     answer: 0,
-    explanation: "『今ある全データを複数バッチで処理し終えたら停止』は trigger(availableNow=True)。厳密1回のために checkpointLocation が必須。checkpoint 無し（B）は再開/重複排除ができない、continuous は常時稼働で自動停止しない、.write（D）はバッチAPIでストリームではない、'checkpoint' というキー名や trigger(batch=True) は存在しない。",
+    explanation: "『今ある全データを複数バッチで処理し終えたら停止』は trigger(availableNow=True)。厳密1回のために checkpointLocation が必須。checkpointLocation 無しでは再開/重複排除ができない、continuous は常時稼働で自動停止しない、.write のバッチAPI版はストリームではない、'checkpoint' というキー名や trigger(batch=True) は存在しない。",
     concept: "トリガー：availableNow（今ある分を複数バッチで処理→停止、増分バッチの定番）／once（1バッチで全処理、旧式）／processingTime='x'（定間隔）／continuous（超低遅延・常時）。checkpointLocation はストリームの進捗と厳密1回を支える必須設定（キー名は 'checkpointLocation'）。"
   },
 
@@ -944,7 +944,7 @@ window.QUESTION_BANK = [
       "UPSERT INTO target USING source ON target.id = source.id"
     ],
     answer: 0,
-    explanation: "正：MERGE INTO ... USING ... ON <条件> WHEN MATCHED THEN UPDATE ... WHEN NOT MATCHED THEN INSERT ...。B は INTO 欠落、C は照合が ON でなく WHERE、D は THEN 欠落、E は UPSERT という文自体が存在しない。",
+    explanation: "正：MERGE INTO ... USING ... ON <条件> WHEN MATCHED THEN UPDATE ... WHEN NOT MATCHED THEN INSERT ...。INTO を欠く／照合を ON でなく WHERE で書く／WHEN 句に THEN が無い、はいずれも不可。UPSERT という文自体も存在しない。",
     concept: "MERGE の骨格：MERGE INTO（INTO 必須）／USING（ソース）／ON（結合条件、WHERE ではない）／WHEN MATCHED [AND 条件] THEN UPDATE|DELETE ／WHEN NOT MATCHED THEN INSERT。各 WHEN 句に THEN が必要。SET * / INSERT * は列名一致の糖衣構文。"
   },
   {
@@ -958,7 +958,7 @@ window.QUESTION_BANK = [
       "SELECT * FROM src INTO TABLE t"
     ],
     answer: 0,
-    explanation: "CTAS は CREATE TABLE <名> AS SELECT ...。AS が必須（B は欠落）。Delta が既定形式なので USING は省略可だが、書くなら 'USING DELTA' で 'AS PARQUET' のような形式指定は不正（C）。FROM SELECT や INTO TABLE という構文は存在しない。",
+    explanation: "CTAS は CREATE TABLE <名> AS SELECT ...。AS が必須（AS を欠くと不可）。Delta が既定形式なので USING は省略可だが、書くなら 'USING DELTA'。'AS PARQUET' のような形式指定や、FROM SELECT・INTO TABLE という構文は存在しない。",
     concept: "テーブル作成の型：CREATE TABLE t (...);（空作成）／CREATE TABLE t AS SELECT ...;（CTAS）／CREATE OR REPLACE TABLE ...;（置換）／CREATE TABLE IF NOT EXISTS ...;（冪等）。形式は既定 Delta、指定は USING DELTA を CREATE 直後に置く。"
   },
   {
@@ -972,7 +972,7 @@ window.QUESTION_BANK = [
       "ALTER TABLE t ZORDER BY (col)"
     ],
     answer: 0,
-    explanation: "正：OPTIMIZE t ZORDER BY (col)。OPTIMIZE がファイル圧縮（コンパクション）、ZORDER BY が指定列でのデータ配置最適化。ORDER BY は通常のソート句で最適化命令ではない（B）。ZORDER 単独文（C）、OPTIMIZE TABLE や BY 欠落（D）、ALTER TABLE への ZORDER（E）はいずれも不正。",
+    explanation: "正：OPTIMIZE t ZORDER BY (col)。OPTIMIZE がファイル圧縮（コンパクション）、ZORDER BY が指定列でのデータ配置最適化。ORDER BY は通常のソート句で最適化命令ではない。ZORDER 単独文、OPTIMIZE に TABLE を付ける・ZORDER の BY 欠落、ALTER TABLE への ZORDER はいずれも不正。",
     concept: "OPTIMIZE：小ファイルをまとめて読み取り効率を上げる。ZORDER BY (列)：相関の高い列で近い値を同じファイルに寄せ、データスキップを強化。範囲を絞るなら OPTIMIZE t WHERE 条件 ZORDER BY (列)。なお新版では手動 ZORDER に代えて Liquid Clustering（CLUSTER BY）が推奨される。"
   },
   {
@@ -986,7 +986,7 @@ window.QUESTION_BANK = [
       "PURGE t RETAIN 168 HOURS"
     ],
     answer: 0,
-    explanation: "正：VACUUM t RETAIN 168 HOURS。単位 HOURS が必須（B は欠落）で、DAYS は受け付けない（C）。OLDER THAN や PURGE という構文は存在しない（D, E）。",
+    explanation: "正：VACUUM t RETAIN 168 HOURS。単位 HOURS が必須（HOURS を欠くと不可）で、DAYS は受け付けない。OLDER THAN や PURGE という構文は存在しない。",
     concept: "VACUUM は不要になった旧ファイルを物理削除する（既定保持は7日＝168時間）。RETAIN <数> HOURS のみ指定可（DAYS 不可）。保持を短くしすぎると時間トラベルや実行中クエリを壊すため下限チェックがある。時間トラベルの履歴自体は保持期間内のみ有効。"
   },
   {
@@ -1071,7 +1071,7 @@ window.QUESTION_BANK = [
       "GRANT MASK mask_email ON COLUMN email TO users"
     ],
     answer: 0,
-    explanation: "列マスクは ALTER TABLE ... ALTER COLUMN <列> SET MASK <関数>。SET であって ADD ではない（C）。ADD MASK ON / SET COLUMN MASK / GRANT MASK という構文は存在しない。",
+    explanation: "列マスクは ALTER TABLE ... ALTER COLUMN <列> SET MASK <関数>。SET であって ADD ではない。ADD MASK ON / SET COLUMN MASK / GRANT MASK という構文は存在しない。",
     concept: "UC の細粒度アクセス制御（いずれも SQL UDF ベース）：列マスク＝ALTER TABLE t ALTER COLUMN c SET MASK f [USING COLUMNS (...)]、行フィルタ＝ALTER TABLE t SET ROW FILTER f ON (列)。解除は DROP MASK / DROP ROW FILTER。多数テーブルへ一元適用したい場合はタグ＋ABAC が発展形。"
   },
 
