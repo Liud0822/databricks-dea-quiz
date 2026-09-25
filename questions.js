@@ -1389,4 +1389,175 @@ window.QUESTION_BANK = [
     concept: "Delta Lake ＝ Parquet データ ＋ トランザクションログ（_delta_log）。ログがコミット履歴を持つため、ACID、タイムトラベル（VERSION/TIMESTAMP AS OF）、スキーマ強制・進化、MERGE/UPDATE/DELETE が可能になる。Lakehouse の基盤フォーマット。"
   },
 
+  /* ===== 追加：弱点強化セット（96〜107）＝ガバナンス/監視/Jobs 重点 ===== */
+
+  {
+    id: 96, domain: "governance",
+    question: "アナリストに catalog c 内の c.sales.orders への SELECT を付与したのに、クエリすると権限エラーになる。追加で必要な権限はどれか（Unity Catalog の階層）。",
+    options: [
+      "カタログに USE CATALOG、スキーマに USE SCHEMA も付与する",
+      "テーブルに ALL PRIVILEGES を付け直す",
+      "メタストア管理者にする",
+      "ワークスペース管理者にする",
+      "テーブルの所有者に変更する"
+    ],
+    answer: 0,
+    explanation: "UC は階層型で、下位オブジェクトを使うには上位の通過権限も要る。テーブルの SELECT に加え、そのスキーマへの USE SCHEMA と、そのカタログへの USE CATALOG が必要。ALL PRIVILEGES や管理者化・所有者化は過剰で、権限エラーの正しい解ではない。",
+    concept: "UC 権限の階層：あるテーブルを読むには〔カタログに USE CATALOG〕＋〔スキーマに USE SCHEMA〕＋〔テーブルに SELECT〕がすべて必要。上位の USE を忘れて『SELECT だけ付けたのに見えない』が定番のハマり所。"
+  },
+  {
+    id: 97, domain: "governance",
+    question: "既存のクラウドストレージ上のデータを Unity Catalog から参照したい。将来テーブルを DROP してもストレージ上のファイルは残したい。どの種類のテーブルにすべきか。",
+    options: [
+      "外部テーブル（LOCATION を明示して作成）",
+      "マネージドテーブル（LOCATION 省略）",
+      "一時ビュー",
+      "マテリアライズドビュー",
+      "グローバル一時ビュー"
+    ],
+    answer: 0,
+    explanation: "DROP してもファイルを残したい／既存の場所を参照したいなら外部テーブル（LOCATION 明示）。マネージドは DROP で実データも削除される。ビュー系は物理データを持たず、この要件（既存ファイルの参照・保持）には合わない。",
+    concept: "マネージド vs 外部：マネージド＝UC がデータも管理し DROP で実データも消える／外部＝LOCATION 明示でメタデータのみ管理し DROP してもファイルは残る。既存データの参照・他ツールとの共有・保持は外部テーブル。"
+  },
+  {
+    id: 98, domain: "governance",
+    question: "あるグループには上位カタログからの継承で SELECT が効いてしまう。特定スキーマ s だけは、継承より優先して明示的に閲覧禁止にしたい。適切な操作はどれか。",
+    options: [
+      "そのスキーマに対して DENY SELECT を設定する",
+      "そのスキーマへの GRANT を REVOKE する",
+      "スキーマを別カタログへ移動する",
+      "グループを削除する",
+      "テーブルを物理的に分割する"
+    ],
+    answer: 0,
+    explanation: "継承より優先して明示的に禁止するのは DENY。REVOKE は『そのレベルで付与した分を外す』だけで、上位からの継承までは止められない。移動・削除・物理分割は運用が破綻し要件にも合わない。",
+    concept: "GRANT（付与）／REVOKE（付与を外す・継承は残りうる）／DENY（明示的拒否で継承より優先）。『継承を上書きして特定範囲だけ禁止』は DENY が正解。"
+  },
+  {
+    id: 99, domain: "monitoring",
+    question: "あるステージのタスク実行時間はほぼ均一なのに全体的に遅く、入力として極端に多数の小さなファイルを読み込んでいる。最も疑うべき原因と対処はどれか。",
+    options: [
+      "スモールファイル問題 → OPTIMIZE でコンパクションする",
+      "データスキュー → 偏るキーを是正する",
+      "ディスクスピル → executor メモリを増やす",
+      "過大なブロードキャスト → 閾値を下げる",
+      "ドライバ OOM → collect をやめる"
+    ],
+    answer: 0,
+    explanation: "タスク時間が均一ならスキューではない。多数の小ファイル読み込みが遅さの主因で、OPTIMIZE（コンパクション）でファイルをまとめると改善する。スキューはタスク時間の偏り、スピルはメモリ不足、broadcast/ドライバ OOM は別症状。",
+    concept: "Spark UI 症状の切り分け：タスク時間が偏る＝スキュー／Spill 大＝メモリ不足／小ファイル多数＝スモールファイル問題（OPTIMIZE）／1タスクだけ突出＝スキュー。"
+  },
+  {
+    id: 100, domain: "monitoring",
+    question: "大テーブルのうち date = '2024-01-01' のデータだけを対象に、col でのデータスキップ最適化を実行したい。正しい構文はどれか。",
+    options: [
+      "OPTIMIZE t WHERE date = '2024-01-01' ZORDER BY (col)",
+      "OPTIMIZE TABLE t WHERE date = '2024-01-01' ZORDER BY (col)",
+      "OPTIMIZE t ZORDER BY (col) WHERE date = '2024-01-01'",
+      "OPTIMIZE t ZORDER (col) WHERE date = '2024-01-01'",
+      "ALTER TABLE t OPTIMIZE WHERE date = '2024-01-01' ZORDER BY (col)"
+    ],
+    answer: 0,
+    explanation: "正しくは OPTIMIZE t WHERE 条件 ZORDER BY (列)。OPTIMIZE は TABLE を付けず裸表名、WHERE は ZORDER の前、ZORDER には BY が必須。ALTER TABLE OPTIMIZE という構文は存在しない。",
+    concept: "OPTIMIZE t [WHERE 条件] [ZORDER BY (列)]。要点：OPTIMIZE/VACUUM は TABLE を付けない、ZORDER には必ず BY、WHERE は ZORDER の前に置く。"
+  },
+  {
+    id: 101, domain: "monitoring",
+    question: "Unity Catalog マネージドテーブルで Predictive Optimization を有効にした。期待できる主な効果はどれか。",
+    options: [
+      "OPTIMIZE（コンパクション）や VACUUM などの保守を Databricks が自動で実行し、手動スケジュールが不要になる",
+      "クエリのたびにテーブルを全走査するようになる",
+      "ストレージ課金がゼロになる",
+      "すべてのクエリが必ず2倍速になる",
+      "スキーマ変更を自動で禁止する"
+    ],
+    answer: 0,
+    explanation: "Predictive Optimization は、必要なタイミングで OPTIMIZE や VACUUM 等の保守を自動実行し、手動での定期メンテナンスを不要にする。全走査化・課金ゼロ・一律2倍速・スキーマ変更禁止といった効果ではない。",
+    concept: "Predictive Optimization：UC マネージドテーブルに対し、いつ・どの最適化（コンパクション/クラスタリング/VACUUM 等）を行うかを自動判断・実行する機能。手動 OPTIMIZE/VACUUM のスケジュール管理から解放される。"
+  },
+  {
+    id: 102, domain: "jobs",
+    question: "後処理タスク cleanup を、上流タスクが『すべて成功した場合のみ（スキップされたものが1つでもあれば実行しない）』動かしたい。依存条件（run if）に設定すべき値はどれか。",
+    options: [
+      "ALL_SUCCESS",
+      "NONE_FAILED",
+      "ALL_DONE",
+      "AT_LEAST_ONE_SUCCESS",
+      "AT_LEAST_ONE_FAILED"
+    ],
+    answer: 0,
+    explanation: "『すべて成功、スキップも許さない』は ALL_SUCCESS。NONE_FAILED は失敗が無ければ実行しスキップは許容してしまう、ALL_DONE は成否問わず実行、AT_LEAST_ONE_* は別条件。『スキップも不可』という但し書きが ALL_SUCCESS と NONE_FAILED の分かれ目。",
+    concept: "run if：ALL_SUCCESS（全依存が成功・スキップ不可・既定）／NONE_FAILED（失敗ゼロならOK・スキップ許容）／ALL_DONE（成否問わず・通知向け）／AT_LEAST_ONE_SUCCESS／AT_LEAST_ONE_FAILED。『スキップを許すか』で ALL_SUCCESS と NONE_FAILED を見分ける。"
+  },
+  {
+    id: 103, domain: "jobs",
+    question: "あるタスクが外部 API の一時的な不調でときどき失敗する。手動対応せず、失敗時に自動で数回リトライさせたい。Lakeflow Jobs での適切な設定はどれか。",
+    options: [
+      "そのタスクにリトライ（最大回数・間隔）ポリシーを設定する",
+      "ジョブ全体を毎分スケジュールし直す",
+      "タスクを削除して手動運用にする",
+      "クラスターを大型化する",
+      "run if を ALL_DONE にする"
+    ],
+    answer: 0,
+    explanation: "一時的失敗の自動回復はタスク単位のリトライ（最大回数・間隔）を設定するのが定石。毎分再スケジュールは無駄で不確実、削除・大型化・run if 変更は一時障害のリトライ手段ではない。",
+    concept: "Lakeflow Jobs のリトライ：タスクごとに『最大リトライ回数』と『間隔』を設定でき、一時的な失敗を自動で回復させる。恒久的なバグには効かない点に注意（原因修正＋修復実行）。"
+  },
+  {
+    id: 104, domain: "jobs",
+    question: "ジョブの途中で、あるタスクの結果（レコード件数など）に応じて後続を分岐させたい（件数が0なら通知だけ、それ以外は集計を実行）。Lakeflow Jobs で使う仕組みはどれか。",
+    options: [
+      "条件分岐（If/else condition）タスクで、タスク値やパラメータを条件に分岐する",
+      "1つの巨大なノートブックに if 文を全部書く",
+      "run if を AT_LEAST_ONE_FAILED にする",
+      "毎回両方のタスクを実行して片方の結果を捨てる",
+      "cron を2本に分ける"
+    ],
+    answer: 0,
+    explanation: "ジョブ DAG の中で条件に応じて経路を変えるには『条件分岐（If/else condition）』タスクを使い、タスク値やジョブパラメータを条件に後続を分ける。単一ノートブックへの詰め込みや run if の流用、両方実行して捨てる運用は分岐の正しい仕組みではない。",
+    concept: "Lakeflow Jobs の制御フロー：If/else condition タスクで分岐、タスク値（前タスクが出した値）やパラメータを条件に使える。retries でリトライ、run if で依存条件、を役割で使い分ける。"
+  },
+  {
+    id: 105, domain: "transformation",
+    question: "メダリオンアーキテクチャの各層の役割として最も適切な組み合わせはどれか。",
+    options: [
+      "Bronze＝生データをそのまま取り込み／Silver＝クレンジング・整形・結合／Gold＝BI・分析向けの集計",
+      "Bronze＝集計済み／Silver＝生データ／Gold＝一時データ",
+      "Bronze＝BI向け／Silver＝生データ／Gold＝バックアップ",
+      "3層とも同じ内容の複製",
+      "Bronze＝Gold の暗号化版"
+    ],
+    answer: 0,
+    explanation: "Bronze は生データをほぼそのまま取り込む層、Silver はクレンジング・型統一・重複排除・結合で整えた層、Gold は BI/ML 向けの集計・ビジネス指標の層。段階的に品質と使いやすさを上げていく。",
+    concept: "メダリオン：Bronze（raw・取り込み）→ Silver（cleaned・conformed）→ Gold（aggregated・business）。下流ほど品質・集約度が高い。ETL の標準的なレイヤ設計。"
+  },
+  {
+    id: 106, domain: "transformation",
+    question: "Bronze テーブルを読み、ts が NULL の行を除外し、amount を DOUBLE 型に整えて Silver テーブルへ書き出したい。適切な PySpark の流れはどれか。",
+    options: [
+      "df.na.drop(subset=['ts']).withColumn('amount', col('amount').cast('double')).write.saveAsTable('silver')",
+      "df.dropDuplicates() だけして書き出す",
+      "df.filter('ts IS NULL') で NULL 行だけ残して書き出す",
+      "df.withColumn('amount','double') で型を変える",
+      "df.collect() でドライバに集めてから1行ずつ書く"
+    ],
+    answer: 0,
+    explanation: "NULL 行の除外は na.drop(subset=[...])、型変換は cast('double')。filter('ts IS NULL') は逆に NULL だけ残す誤り、withColumn('amount','double') は式でなく文字列で型は変わらない、collect は大規模で危険（Driver OOM）。",
+    concept: "Bronze→Silver クレンジングの基本：na.drop / na.fill（NULL 処理）、cast（型統一）、dropDuplicates（重複排除）、filter/where（不正行除去）。分散処理のまま行い collect は避ける。"
+  },
+  {
+    id: 107, domain: "ingestion",
+    question: "クラウドストレージ上の CSV を、テーブルを作らずに SQL でその場でアドホックに読み取りたい（スキーマも自動推論させたい）。適切なものはどれか。",
+    options: [
+      "SELECT * FROM read_files('/path/to/csv', format => 'csv')",
+      "SELECT * FROM '/path/to/csv'",
+      "SELECT * FROM OPENROWSET('/path/to/csv')",
+      "SELECT * FROM csv.load('/path/to/csv')",
+      "COPY INTO でしか読めない"
+    ],
+    answer: 0,
+    explanation: "read_files() はクラウドストレージ上のファイルをテーブル化せず SQL でその場で読めるテーブル値関数で、format => 'csv' 等を指定でき、スキーマ推論にも対応する。OPENROWSET や csv.load は Databricks の構文ではない。COPY INTO は取り込み用でアドホック参照とは別。",
+    concept: "read_files('パス', format => 'csv'|'json'|'parquet' ...)：ストレージ上のファイルを一時的に SQL で読むテーブル値関数（スキーマ推論・進化に対応）。Auto Loader / COPY INTO は『テーブルへ取り込む』のに対し、read_files は『その場で読む』のが主用途。"
+  },
+
 ];
