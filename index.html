@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Databricks DEA 練習問題</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1b1f24; --muted:#5c6773;
+    --line:#e4e7eb; --brand:#ff3621; --brand-ink:#ffffff;
+    --ok:#0a8f4e; --ok-bg:#e7f6ee; --ng:#d92d20; --ng-bg:#fdeceb;
+    --accent:#1d6fe0; --chip:#eef1f4; --shadow:0 1px 3px rgba(0,0,0,.08),0 10px 30px rgba(0,0,0,.05);
+    --mark:#c77700; --mark-bg:#fdf3e0;
+    --fs:18px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1216; --panel:#181c22; --ink:#e8eaed; --muted:#9aa4af;
+      --line:#2a2f37; --brand:#ff5a44; --brand-ink:#1a0e0c;
+      --ok:#37d18a; --ok-bg:#12301f; --ng:#ff6b60; --ng-bg:#331513;
+      --accent:#5aa2ff; --chip:#222831; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.3);
+      --mark:#f0b429; --mark-bg:#3a2e10;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1216; --panel:#181c22; --ink:#e8eaed; --muted:#9aa4af;
+    --line:#2a2f37; --brand:#ff5a44; --brand-ink:#1a0e0c;
+    --ok:#37d18a; --ok-bg:#12301f; --ng:#ff6b60; --ng-bg:#331513;
+    --accent:#5aa2ff; --chip:#222831; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.3);
+    --mark:#f0b429; --mark-bg:#3a2e10;
+  }
+  *{box-sizing:border-box}
+  html{font-size:var(--fs)}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
+    line-height:1.7; -webkit-font-smoothing:antialiased; font-size:1rem;
+  }
+  .wrap{max-width:1000px; margin:0 auto; padding:26px 20px 80px}
+  header.top{display:flex; align-items:center; gap:16px; padding:6px 2px 22px}
+  .logo{width:46px;height:46px;border-radius:11px;background:var(--brand);color:var(--brand-ink);
+    display:grid;place-items:center;font-weight:800;font-size:26px;flex:none}
+  .title{font-size:1.4rem;font-weight:800;letter-spacing:.2px}
+  .sub{font-size:.82rem;color:var(--muted);margin-top:2px}
+  .spacer{flex:1}
+  .theme-btn{border:1px solid var(--line);background:var(--panel);color:var(--muted);
+    border-radius:10px;padding:9px 14px;cursor:pointer;font-size:.82rem;font-family:inherit}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    box-shadow:var(--shadow);padding:28px;margin-bottom:20px}
+  h2{margin:0 0 6px;font-size:1.18rem}
+  h3{margin:0 0 12px;font-size:.95rem;color:var(--muted);font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .lead{color:var(--muted);font-size:.9rem;margin:0 0 20px}
+  .row{display:flex;flex-wrap:wrap;gap:12px}
+  .field{margin-bottom:22px}
+  .field > label{display:block;font-weight:700;font-size:.92rem;margin-bottom:11px}
+  .seg{display:flex;gap:10px;flex-wrap:wrap}
+  .seg button, .chip-btn{
+    border:1.5px solid var(--line);background:var(--panel);color:var(--ink);
+    border-radius:999px;padding:11px 18px;cursor:pointer;font-size:.92rem;font-family:inherit;transition:.12s}
+  .seg button.active{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+  .chip-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .dom-grid{display:flex;flex-wrap:wrap;gap:10px}
+  select{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);
+    border-radius:11px;padding:12px 14px;font-size:1rem;font-family:inherit}
+  .cta{display:inline-flex;align-items:center;gap:9px;background:var(--brand);color:var(--brand-ink);
+    border:none;border-radius:13px;padding:16px 30px;font-size:1.05rem;font-weight:800;cursor:pointer;
+    box-shadow:var(--shadow);font-family:inherit}
+  .cta:disabled{opacity:.45;cursor:not-allowed}
+  .ghost{background:var(--panel);color:var(--ink);border:1.5px solid var(--line);
+    border-radius:13px;padding:14px 22px;font-size:.95rem;font-weight:700;cursor:pointer;font-family:inherit}
+  .ghost.warn{color:var(--ng);border-color:var(--ng)}
+  .ghost.review{color:var(--accent);border-color:var(--accent)}
+  .ghost.mark{color:var(--mark);border-color:var(--mark)}
+  .ghost.sm{padding:10px 16px;font-size:.88rem}
+  .count-note{font-size:.85rem;color:var(--muted);margin-top:11px}
+
+  /* stats */
+  .stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  .stat{background:var(--chip);border-radius:13px;padding:16px 14px;text-align:center}
+  .stat .v{font-size:1.7rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .stat .l{font-size:.76rem;color:var(--muted);margin-top:7px}
+  .stat.wrong .v{color:var(--ng)}
+  .stat.mark .v{color:var(--mark)}
+  @media(max-width:640px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+
+  /* progress */
+  .pbar-wrap{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+  .pbar{flex:1;height:10px;background:var(--chip);border-radius:999px;overflow:hidden}
+  .pbar > i{display:block;height:100%;width:0;background:var(--brand);transition:width .25s}
+  .pmeta{font-size:.85rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:700}
+
+  .qmeta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .tag{font-size:.76rem;padding:5px 12px;border-radius:999px;background:var(--chip);color:var(--muted);font-weight:700}
+  .tag.mode{background:var(--accent);color:#fff}
+  .tag.mode.mk{background:var(--mark);color:#fff}
+  .tag.mk{background:var(--mark-bg);color:var(--mark)}
+  .markbtn{border:1.5px solid var(--line);background:var(--panel);color:var(--muted);
+    border-radius:999px;padding:7px 14px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit}
+  .markbtn.on{background:var(--mark-bg);color:var(--mark);border-color:var(--mark)}
+  .qtext{font-size:1.28rem;font-weight:700;margin:4px 0 22px;white-space:pre-wrap;line-height:1.6}
+  .opts{display:flex;flex-direction:column;gap:13px}
+  .opt{display:flex;gap:15px;align-items:flex-start;text-align:left;width:100%;
+    border:2px solid var(--line);background:var(--panel);color:var(--ink);
+    border-radius:14px;padding:17px 19px;cursor:pointer;font-size:1.08rem;font-family:inherit;transition:.12s;line-height:1.5}
+  .opt:hover:not(:disabled){border-color:var(--accent)}
+  .opt .k{flex:none;width:30px;height:30px;border-radius:8px;background:var(--chip);
+    display:grid;place-items:center;font-weight:800;font-size:.95rem;margin-top:1px}
+  .opt.selected{border-color:var(--accent)}
+  .opt.selected .k{background:var(--accent);color:#fff}
+  .opt.correct{border-color:var(--ok);background:var(--ok-bg)}
+  .opt.correct .k{background:var(--ok);color:#fff}
+  .opt.wrong{border-color:var(--ng);background:var(--ng-bg)}
+  .opt.wrong .k{background:var(--ng);color:#fff}
+  .opt:disabled{cursor:default}
+  .explain{margin-top:18px;border-left:4px solid var(--accent);background:var(--chip);
+    border-radius:0 12px 12px 0;padding:16px 18px;font-size:1rem;display:none}
+  .explain.show{display:block;animation:fade .2s}
+  .explain .verdict{font-weight:800;margin-bottom:6px;font-size:1.05rem}
+  .explain .verdict.ok{color:var(--ok)} .explain .verdict.ng{color:var(--ng)}
+  .concept{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);font-size:.96rem;color:var(--ink);line-height:1.7}
+  .concept-label{display:inline-block;font-weight:800;color:var(--accent);margin-right:8px}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  .navbar{display:flex;gap:12px;margin-top:26px;align-items:center;flex-wrap:wrap}
+  .navbar .spacer{flex:1}
+
+  /* results */
+  .score-hero{text-align:center;padding:10px 0 8px}
+  .score-num{font-size:4rem;font-weight:800;line-height:1;letter-spacing:-1px}
+  .score-num.pass{color:var(--ok)} .score-num.fail{color:var(--ng)}
+  .score-sub{color:var(--muted);font-size:.95rem;margin-top:8px}
+  .verdict-pill{display:inline-block;margin-top:15px;padding:8px 20px;border-radius:999px;font-weight:800;font-size:.92rem}
+  .verdict-pill.pass{background:var(--ok-bg);color:var(--ok)}
+  .verdict-pill.fail{background:var(--ng-bg);color:var(--ng)}
+  table.dom{width:100%;border-collapse:collapse;margin-top:8px;font-size:.98rem}
+  table.dom th,table.dom td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line)}
+  table.dom th{color:var(--muted);font-weight:700;font-size:.82rem}
+  table.dom td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .minibar{height:8px;background:var(--chip);border-radius:999px;overflow:hidden;margin-top:7px}
+  .minibar>i{display:block;height:100%;background:var(--ok)}
+  .review-item{border:1.5px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+  .review-item.ng{border-color:var(--ng)}
+  .review-item .q{font-weight:700;margin-bottom:11px;font-size:1.05rem}
+  .review-line{font-size:.98rem;margin:5px 0;display:flex;gap:10px}
+  .review-line .lab{flex:none;font-weight:800}
+  .review-line.your{color:var(--ng)} .review-line.ans{color:var(--ok)}
+  .review-exp{font-size:.95rem;color:var(--muted);margin-top:11px;border-top:1px dashed var(--line);padding-top:11px}
+
+  /* history list */
+  .hist{display:flex;flex-direction:column;gap:8px}
+  .hist-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--chip);border-radius:11px;font-size:.9rem}
+  .hist-row .when{color:var(--muted);flex:1;font-variant-numeric:tabular-nums}
+  .hist-row .mtag{font-size:.74rem;padding:3px 9px;border-radius:999px;background:var(--panel);color:var(--muted);font-weight:700}
+  .hist-row .sc{font-weight:800;font-variant-numeric:tabular-nums}
+  .hist-row .sc.pass{color:var(--ok)} .hist-row .sc.fail{color:var(--ng)}
+  .empty{color:var(--muted);font-size:.9rem;padding:8px 2px}
+
+  /* question list (一覧) */
+  .qlist{display:flex;flex-direction:column;gap:10px}
+  .qrow{display:flex;gap:14px;align-items:center;padding:14px 16px;border:1.5px solid var(--line);border-radius:13px}
+  .qrow.unseen{border-style:dashed}
+  .qrow.weak{border-color:var(--ng)}
+  .qrow-main{flex:1;min-width:0}
+  .qrow-head{display:flex;gap:8px;align-items:center;margin-bottom:4px}
+  .qrow-q{font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+  .qrow-stat{display:flex;gap:16px;flex:none;text-align:center}
+  .qrow-stat .m{font-size:.72rem;color:var(--muted)}
+  .qrow-stat .m b{display:block;font-size:1.15rem;color:var(--ink);font-variant-numeric:tabular-nums;font-weight:800}
+  .qrow-stat .m.rate b.ok{color:var(--ok)} .qrow-stat .m.rate b.ng{color:var(--ng)}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .dot.g{background:var(--muted)} .dot.green{background:var(--ok)} .dot.red{background:var(--ng)} .dot.amber{background:#e0a800}
+  @media(max-width:640px){ .qrow-q{white-space:normal} .qrow-stat{gap:12px} }
+
+  .hidden{display:none !important}
+  .err{background:var(--ng-bg);color:var(--ng);border:1px solid var(--ng);border-radius:12px;padding:16px;font-size:1rem}
+  .foot{color:var(--muted);font-size:.78rem;text-align:center;margin-top:30px;line-height:1.8}
+  kbd{background:var(--chip);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:2px 8px;font-size:.78rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">D</div>
+    <div>
+      <div class="title">Databricks DEA 練習問題</div>
+      <div class="sub">Certified Data Engineer Associate ・ 2026年5月4日 改定版（7領域）対応</div>
+    </div>
+    <div class="spacer"></div>
+    <button class="theme-btn" id="themeBtn" title="表示切替">◐ テーマ</button>
+  </header>
+
+  <div id="app"></div>
+
+  <div class="foot">
+    ローカル学習用の非公式問題集です（実際の試験問題ではありません）。<br>
+    問題の追加は <b>questions.js</b> を編集して保存 → このページを再読み込み。<br>
+    解答履歴・成績・間違い問題はこのブラウザに保存されます（別PC・別ブラウザには引き継がれません）。
+  </div>
+</div>
+
+<script src="questions.js"></script>
+<script>
+(function(){
+  "use strict";
+  var app = document.getElementById("app");
+  var BANK = window.QUESTION_BANK || [];
+  var LABELS = window.DOMAIN_LABELS || {};
+  var DOM_SHORT = {
+    platform:"基礎", ingestion:"取り込み", transformation:"変換",
+    jobs:"Jobs", cicd:"CI/CD", monitoring:"監視/最適化", governance:"ガバナンス"
+  };
+  var PASS_LINE = 70;
+
+  var LS = { theme:"dea_theme", hist:"dea_v2_history", wrong:"dea_v2_wrong", stats:"dea_v2_stats", attempts:"dea_v2_attempts", user:"dea_user", mark:"dea_v2_mark" };
+  function lsGet(k, def){ try{ var v=localStorage.getItem(k); return v==null?def:JSON.parse(v); }catch(e){ return def; } }
+  function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  function lsGetRaw(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSetRaw(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+  // ---- theme ----
+  var themeBtn = document.getElementById("themeBtn");
+  (function(){ var t=lsGetRaw(LS.theme); if(t) document.documentElement.setAttribute("data-theme",t); })();
+  themeBtn.addEventListener("click", function(){
+    var cur=document.documentElement.getAttribute("data-theme");
+    var isDark = cur==="dark" || (!cur && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var t=isDark?"light":"dark"; document.documentElement.setAttribute("data-theme",t); lsSetRaw(LS.theme,t);
+  });
+
+  if(!BANK.length){
+    app.innerHTML='<div class="card"><div class="err">問題が読み込めませんでした。questions.js が index.html と同じフォルダにあるか確認してください。</div></div>';
+    return;
+  }
+
+  // ---- state ----
+  var settings = { mode:"practice", domains:"all", amount:"all", order:"priority" };
+  var quiz = null;
+  var listFilter = "all";
+
+  function byId(id){ for(var i=0;i<BANK.length;i++){ if(BANK[i].id===id) return BANK[i]; } return null; }
+  function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+  function shuffleArr(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i];a[i]=a[j];a[j]=t;} return a; }
+  function domCounts(){ var m={}; BANK.forEach(function(q){ m[q.domain]=(m[q.domain]||0)+1; }); return m; }
+  function getStats(){ return lsGet(LS.stats, {}); }
+  function seenOf(st,id){ return st[id]?st[id].seen:0; }
+  function wrongIds(){ return lsGet(LS.wrong, []).filter(function(id){ return byId(id); }); }
+  // マーク（自信がない問題）。間違いとは別枠。蒙对（正解だが自信なし）を取りこぼさないための旗。
+  function markIds(){ return lsGet(LS.mark, []).filter(function(id){ return byId(id); }); }
+  function isMarked(id){ return lsGet(LS.mark, []).indexOf(id)>=0; }
+  function toggleMark(id){ var m=lsGet(LS.mark,[]); var i=m.indexOf(id); if(i>=0) m.splice(i,1); else m.push(id); lsSet(LS.mark,m); }
+
+  // 出題順の適用
+  function orderList(list){
+    if(settings.order==="fixed") return list.slice();
+    if(settings.order==="random") return shuffleArr(list.slice());
+    // priority: 未出題→出題回数が少ない順、同数はランダム
+    var st=getStats();
+    return list.slice().map(function(q){ return {q:q, seen:seenOf(st,q.id), r:Math.random()}; })
+      .sort(function(a,b){ return (a.seen-b.seen) || (a.r-b.r); })
+      .map(function(x){ return x.q; });
+  }
+  function sliceAmount(list){
+    if(settings.amount!=="all"){ var n=parseInt(settings.amount,10); if(list.length>n) return list.slice(0,n); }
+    return list;
+  }
+  function filteredList(){
+    var list=BANK.filter(function(q){ return settings.domains==="all" || settings.domains.indexOf(q.domain)>=0; });
+    return sliceAmount(orderList(list));
+  }
+
+  // ---- データ書き出し（分析ラボ用 CSV） ----
+  function toCsv(rows, cols){
+    var esc=function(v){ v=(v==null?"":String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+    return cols.join(",")+"\n"+rows.map(function(r){return cols.map(function(c){return esc(r[c]);}).join(",");}).join("\n")+"\n";
+  }
+  function download(name, text){
+    try{
+      var blob=new Blob([text],{type:"text/csv;charset=utf-8"});
+      var url=URL.createObjectURL(blob); var a=document.createElement("a");
+      a.href=url; a.download=name; document.body.appendChild(a); a.click();
+      setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },120);
+    }catch(e){ alert("ダウンロードに失敗しました: "+e); }
+  }
+  function pad2(n){ return (n<10?"0":"")+n; }
+  function fmtTs(ms){ var d=new Date(ms); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())+" "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds()); }
+  function exportData(){
+    var qrows=BANK.map(function(q){return {question_id:q.id, domain:q.domain};});
+    download("quiz_questions.csv", toCsv(qrows,["question_id","domain"]));
+    var st=getStats();
+    var srows=BANK.map(function(q){ var s=st[q.id]||{seen:0,correct:0}; return {question_id:q.id, domain:q.domain, seen:s.seen, correct:s.correct}; });
+    download("quiz_stats.csv", toCsv(srows,["question_id","domain","seen","correct"]));
+    var att=lsGet(LS.attempts, []);
+    var arows=att.map(function(a,i){ return { attempt_id:1000001+i, user_id:1, session_id:a.sid, mode:a.mode, question_id:a.qid, is_correct:a.correct, answered_at:fmtTs(a.ts) }; });
+    download("quiz_attempts.csv", toCsv(arows,["attempt_id","user_id","session_id","mode","question_id","is_correct","answered_at"]));
+  }
+
+  // 今日の受験CSV（Databricks の app_attempts と同じ列）。1日1ファイル、その日ぶんが全部入る。
+  function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+  function exportDailyCsv(){
+    var user=(lsGetRaw(LS.user)||"local").trim()||"local";
+    var att=lsGet(LS.attempts, []); var today=todayStr();
+    var rows=att.filter(function(a){ return fmtTs(a.ts).slice(0,10)===today; }).map(function(a){
+      return { attempt_id:"h"+a.ts, principal:user, session_id:a.sid, mode:a.mode,
+               question_id:a.qid, domain:a.domain, is_correct:a.correct, answered_at:fmtTs(a.ts) };
+    });
+    if(!rows.length){ alert("今日の受験データがありません。まず1回解いてください。"); return; }
+    download("quiz_attempts_"+today+".csv",
+      toCsv(rows,["attempt_id","principal","session_id","mode","question_id","domain","is_correct","answered_at"]));
+  }
+
+  // =========================================================================
+  // START SCREEN
+  // =========================================================================
+  function renderStart(){
+    var counts=domCounts();
+    var domKeys=Object.keys(LABELS).filter(function(k){ return counts[k]; });
+    Object.keys(counts).forEach(function(k){ if(domKeys.indexOf(k)<0) domKeys.push(k); });
+
+    var hist=lsGet(LS.hist, []), wrong=wrongIds(), mark=markIds(), st=getStats();
+    var attempts=hist.length;
+    var avg=attempts?Math.round(hist.reduce(function(s,h){return s+h.pct;},0)/attempts):0;
+    var best=attempts?Math.max.apply(null,hist.map(function(h){return h.pct;})):0;
+    var seenCount=BANK.filter(function(q){ return seenOf(st,q.id)>0; }).length;
+
+    // 章節別 累計集計（同じ問題を複数回解いた回数も加算）
+    var domAgg={};
+    Object.keys(st).forEach(function(k){
+      var s=st[k]||{}; var qq=byId(parseInt(k,10)); var dk=qq?qq.domain:"(削除済み)";
+      if(!domAgg[dk]) domAgg[dk]={seen:0,correct:0};
+      domAgg[dk].seen+=(s.seen||0); domAgg[dk].correct+=(s.correct||0);
+    });
+    var domRateKeys=domKeys.slice();
+    Object.keys(domAgg).forEach(function(k){ if(domRateKeys.indexOf(k)<0) domRateKeys.push(k); });
+    var domRateRows=domRateKeys.map(function(k){
+      var a=domAgg[k]||{seen:0,correct:0};
+      var p=a.seen?Math.round(a.correct/a.seen*100):null;
+      var col=p==null?"var(--muted)":(p>=70?"var(--ok)":(p>=50?"#e0a800":"var(--ng)"));
+      return '<tr><td>'+esc(LABELS[k]||k)+'<div class="minibar"><i style="width:'+(p==null?0:p)+'%;background:'+col+'"></i></div></td>'+
+        '<td class="n">'+a.seen+'</td><td class="n">'+a.correct+'</td><td class="n">'+(p==null?"—":p+"%")+'</td></tr>';
+    }).join("");
+
+    var domHtml=domKeys.map(function(k){
+      var on=settings.domains!=="all" && settings.domains.indexOf(k)>=0;
+      return '<button class="chip-btn'+(on?' on':'')+'" data-dom="'+k+'">'+esc(LABELS[k]||k)+' <span style="opacity:.7">('+counts[k]+')</span></button>';
+    }).join("");
+
+    var histHtml=attempts?hist.slice(0,8).map(function(h){
+      var pass=h.pct>=PASS_LINE;
+      return '<div class="hist-row"><span class="mtag">'+esc(h.label)+'</span><span class="when">'+esc(h.when)+
+        '</span><span class="sc '+(pass?'pass':'fail')+'">'+h.pct+'%</span><span style="color:var(--muted);font-size:.82rem">'+h.correct+'/'+h.total+'</span></div>';
+    }).join(""):'<div class="empty">まだ履歴はありません。1回解くとここに記録されます。</div>';
+
+    app.innerHTML=
+    '<div class="card">'+
+      '<h3>学習状況</h3>'+
+      '<div class="stat-grid">'+
+        '<div class="stat"><div class="v">'+seenCount+'/'+BANK.length+'</div><div class="l">出題済み</div></div>'+
+        '<div class="stat"><div class="v">'+attempts+'</div><div class="l">受験回数</div></div>'+
+        '<div class="stat"><div class="v">'+(attempts?avg+'%':'—')+'</div><div class="l">平均正答率</div></div>'+
+        '<div class="stat wrong"><div class="v">'+wrong.length+'</div><div class="l">間違い問題</div></div>'+
+        '<div class="stat mark"><div class="v">'+mark.length+'</div><div class="l">🚩 マーク問題</div></div>'+
+      '</div>'+
+      '<div class="row" style="margin-top:18px">'+
+        '<button class="cta" id="reviewWrongBtn" '+(wrong.length?'':'disabled')+'>✕ 間違い問題だけ復習'+(wrong.length?'（'+wrong.length+'問）':'')+'</button>'+
+        '<button class="ghost mark" id="reviewMarkBtn" '+(mark.length?'':'disabled')+'>🚩 マーク問題だけ復習'+(mark.length?'（'+mark.length+'問）':'')+'</button>'+
+        '<button class="ghost review" id="listBtn">▤ 問題一覧・成績</button>'+
+        '<button class="ghost" id="exportBtn">⇩ データ書き出し（分析用）</button>'+
+        '<button class="ghost" id="dailyBtn">⇩ 今日の受験CSV（DB取込用）</button>'+
+        (attempts||seenCount?'<button class="ghost warn" id="clearBtn">成績をクリア</button>':'')+
+      '</div>'+
+      '<div class="count-note" style="margin-top:10px">CSVの利用者名（principal）：'+
+        '<input id="userInput" type="text" value="'+esc(lsGetRaw(LS.user)||"")+'" placeholder="local" '+
+        'style="border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 10px;font-size:.9rem;font-family:inherit;width:220px;margin-left:6px"></div>'+
+      (attempts?'<div class="count-note">最高スコア '+best+'%</div>':'')+
+    '</div>'+
+
+    '<div class="card">'+
+      '<h3>章節別の正答率（累計・重複含む）</h3>'+
+      '<table class="dom"><thead><tr><th>ドメイン</th><th class="n">回答</th><th class="n">正解</th><th class="n">正答率</th></tr></thead><tbody>'+domRateRows+'</tbody></table>'+
+      '<div class="count-note">「回答」＝累計の解答回数（同じ問題を複数回解くとその回数だけ加算）。バー色：緑70%以上／橙50〜69%／赤50%未満。</div>'+
+    '</div>'+
+
+    '<div class="card">'+
+      '<h2>練習の設定</h2>'+
+      '<p class="lead">モードと範囲を選んで開始してください。</p>'+
+      '<div class="field"><label>モード</label>'+
+        '<div class="seg" id="modeSeg">'+
+          '<button data-mode="practice" class="'+(settings.mode==="practice"?"active":"")+'">練習モード（即時採点＋解説）</button>'+
+          '<button data-mode="exam" class="'+(settings.mode==="exam"?"active":"")+'">試験モード（最後にまとめて採点）</button>'+
+        '</div></div>'+
+      '<div class="field"><label>ドメイン（未選択＝すべて / 複数選択可）</label>'+
+        '<div class="dom-grid" id="domGrid">'+domHtml+'</div></div>'+
+      '<div class="field"><label>出題順</label>'+
+        '<select id="orderSel" style="min-width:280px">'+
+          '<option value="priority">未出題を優先（推奨）</option>'+
+          '<option value="random">完全ランダム</option>'+
+          '<option value="fixed">固定順（ID順）</option>'+
+        '</select>'+
+        '<div class="count-note">「未出題を優先」＝まだ解いていない問題から先に出題し、一巡したら出題回数の少ない順に出します。</div>'+
+      '</div>'+
+      '<div class="field"><label>出題数</label>'+
+        '<select id="amountSel">'+
+          '<option value="all">全問</option><option value="5">5問</option><option value="10">10問</option>'+
+          '<option value="20">20問</option><option value="45">45問（本番と同数）</option>'+
+        '</select>'+
+        '<div class="count-note" id="countNote"></div>'+
+      '</div>'+
+      '<button class="cta" id="startBtn">▶ 開始する</button>'+
+    '</div>'+
+
+    '<div class="card"><h3>解答履歴</h3><div class="hist">'+histHtml+'</div></div>';
+
+    document.getElementById("modeSeg").addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b)return; settings.mode=b.dataset.mode; segActive("modeSeg",b); });
+    document.getElementById("domGrid").addEventListener("click", function(e){
+      var b=e.target.closest("button"); if(!b)return; var k=b.dataset.dom;
+      if(settings.domains==="all") settings.domains=[];
+      var i=settings.domains.indexOf(k);
+      if(i>=0){ settings.domains.splice(i,1); b.classList.remove("on"); } else { settings.domains.push(k); b.classList.add("on"); }
+      if(settings.domains.length===0) settings.domains="all";
+      updateCount();
+    });
+    var os=document.getElementById("orderSel"); os.value=settings.order; os.addEventListener("change", function(e){ settings.order=e.target.value; });
+    var am=document.getElementById("amountSel"); am.value=settings.amount; am.addEventListener("change", function(e){ settings.amount=e.target.value; updateCount(); });
+    document.getElementById("startBtn").addEventListener("click", startQuiz);
+    document.getElementById("reviewWrongBtn").addEventListener("click", startWrongReview);
+    var rmb=document.getElementById("reviewMarkBtn"); if(rmb) rmb.addEventListener("click", startMarkReview);
+    document.getElementById("listBtn").addEventListener("click", function(){ listFilter="all"; renderList(); });
+    document.getElementById("exportBtn").addEventListener("click", exportData);
+    var _db=document.getElementById("dailyBtn"); if(_db) _db.addEventListener("click", exportDailyCsv);
+    var _ui=document.getElementById("userInput"); if(_ui) _ui.addEventListener("change", function(e){ lsSetRaw(LS.user, e.target.value.trim()); });
+    var cb=document.getElementById("clearBtn");
+    if(cb) cb.addEventListener("click", function(){
+      if(confirm("解答履歴・成績（各問の出題/正解回数）・間違い問題・マーク問題の記録をすべて消去しますか？（元に戻せません）")){
+        lsSet(LS.hist,[]); lsSet(LS.wrong,[]); lsSet(LS.stats,{}); lsSet(LS.mark,[]); renderStart();
+      }
+    });
+    updateCount();
+  }
+  function segActive(id,btn){ Array.prototype.forEach.call(document.getElementById(id).children,function(c){c.classList.remove("active");}); btn.classList.add("active"); }
+  function updateCount(){
+    var n=filteredList().length; var note=document.getElementById("countNote");
+    if(note) note.textContent="この条件で "+n+" 問を出題します。";
+    var sb=document.getElementById("startBtn"); if(sb) sb.disabled=n===0;
+  }
+
+  // =========================================================================
+  // 問題一覧・成績
+  // =========================================================================
+  function renderList(){
+    var st=getStats(), wrong=wrongIds(), mark=markIds();
+    var rows=BANK.slice().sort(function(a,b){ return a.id-b.id; });
+
+    function isUnseen(q){ return seenOf(st,q.id)===0; }
+    function rateOf(q){ var s=st[q.id]; return (s&&s.seen)?Math.round(s.correct/s.seen*100):null; }
+    function isWeak(q){ var r=rateOf(q); return r!==null && r<50; }
+
+    var filtered=rows.filter(function(q){
+      if(listFilter==="unseen") return isUnseen(q);
+      if(listFilter==="weak") return isWeak(q) || wrong.indexOf(q.id)>=0;
+      if(listFilter==="mark") return mark.indexOf(q.id)>=0;
+      return true;
+    });
+
+    var unseenAll=rows.filter(isUnseen).length;
+
+    var rowsHtml=filtered.map(function(q){
+      var s=st[q.id]||{seen:0,correct:0};
+      var r=rateOf(q);
+      var cls="qrow"+(s.seen===0?" unseen":"")+(isWeak(q)?" weak":"");
+      var dot = s.seen===0 ? "g" : (r>=70?"green":(r>=50?"amber":"red"));
+      var rateHtml = r===null ? '<b>—</b>' : '<b class="'+(r>=70?'ok':(r<50?'ng':''))+'">'+r+'%</b>';
+      return '<div class="'+cls+'">'+
+        '<span class="dot '+dot+'"></span>'+
+        '<div class="qrow-main"><div class="qrow-head"><span class="tag">#'+q.id+'</span><span class="tag">'+esc(DOM_SHORT[q.domain]||q.domain)+'</span>'+(mark.indexOf(q.id)>=0?'<span class="tag mk">🚩</span>':'')+'</div>'+
+          '<div class="qrow-q">'+esc(q.question)+'</div></div>'+
+        '<div class="qrow-stat">'+
+          '<div class="m">出題<b>'+s.seen+'</b></div>'+
+          '<div class="m">正解<b>'+s.correct+'</b></div>'+
+          '<div class="m rate">正答率'+rateHtml+'</div>'+
+        '</div></div>';
+    }).join("") || '<div class="empty">該当する問題はありません。</div>';
+
+    app.innerHTML=
+    '<div class="card">'+
+      '<div class="row" style="align-items:center;margin-bottom:6px"><h2 style="margin:0">問題一覧・成績</h2><div class="spacer"></div>'+
+        '<button class="ghost sm" id="backBtn">← 戻る</button></div>'+
+      '<p class="lead">各問の出題回数・正解回数・正答率です（このブラウザの記録）。ドット＝グレー:未出題 / 緑:70%以上 / 橙:50〜69% / 赤:50%未満。</p>'+
+      '<div class="seg" style="margin-bottom:18px" id="listFilterSeg">'+
+        '<button data-f="all" class="'+(listFilter==="all"?"active":"")+'">すべて（'+rows.length+'）</button>'+
+        '<button data-f="unseen" class="'+(listFilter==="unseen"?"active":"")+'">未出題（'+unseenAll+'）</button>'+
+        '<button data-f="weak" class="'+(listFilter==="weak"?"active":"")+'">苦手・間違い</button>'+
+        '<button data-f="mark" class="'+(listFilter==="mark"?"active":"")+'">🚩 マーク（'+mark.length+'）</button>'+
+      '</div>'+
+      (listFilter==="mark"&&mark.length?'<button class="cta" id="startMark" style="margin-bottom:18px">🚩 マーク問題を出題（'+mark.length+'問）</button>':'')+
+      (listFilter!=="mark"&&unseenAll?'<button class="cta" id="startUnseen" style="margin-bottom:18px">▶ 未出題を'+(settings.amount==="all"?"全部":settings.amount+"問")+'出題</button>':'')+
+      '<div class="qlist">'+rowsHtml+'</div>'+
+    '</div>';
+
+    document.getElementById("backBtn").addEventListener("click", renderStart);
+    document.getElementById("listFilterSeg").addEventListener("click", function(e){ var b=e.target.closest("button"); if(!b)return; listFilter=b.dataset.f; renderList(); });
+    var su=document.getElementById("startUnseen");
+    if(su) su.addEventListener("click", function(){
+      var stx=getStats();
+      var pool=BANK.filter(function(q){ return seenOf(stx,q.id)===0; });
+      pool=sliceAmount(orderList(pool));
+      beginQuiz(pool, "practice");
+    });
+    var sm=document.getElementById("startMark");
+    if(sm) sm.addEventListener("click", startMarkReview);
+    window.scrollTo(0,0);
+  }
+
+  // =========================================================================
+  // QUIZ
+  // =========================================================================
+  function beginQuiz(list, source){
+    if(!list.length) return;
+    var sid = "app-"+Date.now()+"-"+Math.floor(Math.random()*1000);
+    quiz={ list:list, idx:0, answers:new Array(list.length).fill(null), mode:settings.mode, source:source, session:sid };
+    renderQ(); window.scrollTo(0,0);
+  }
+  function startQuiz(){ beginQuiz(filteredList(), "practice"); }
+  function startWrongReview(){ var ids=wrongIds(); if(!ids.length) return; beginQuiz(orderList(ids.map(byId)), "wrong"); }
+  function startMarkReview(){ var ids=markIds(); if(!ids.length) return; beginQuiz(orderList(ids.map(byId)), "mark"); }
+
+  function renderQ(){
+    var q=quiz.list[quiz.idx], total=quiz.list.length, sel=quiz.answers[quiz.idx];
+    var answered=sel!==null, showFeedback=quiz.mode==="practice"&&answered, keys="ABCDEF";
+
+    var optsHtml=q.options.map(function(opt,i){
+      var cls="opt";
+      if(showFeedback){ if(i===q.answer) cls+=" correct"; else if(i===sel) cls+=" wrong"; }
+      else if(i===sel) cls+=" selected";
+      return '<button class="'+cls+'" data-i="'+i+'" '+(showFeedback?"disabled":"")+'><span class="k">'+keys[i]+'</span><span>'+esc(opt)+'</span></button>';
+    }).join("");
+
+    var expHtml="";
+    if(showFeedback){ var ok=sel===q.answer;
+      expHtml='<div class="explain show"><div class="verdict '+(ok?"ok":"ng")+'">'+(ok?"◯ 正解":"✕ 不正解")+'（正解：'+keys[q.answer]+'）</div>'+esc(q.explanation)+
+        (q.concept?('<div class="concept"><span class="concept-label">📘 用語・ポイント</span>'+esc(q.concept)+'</div>'):'')+'</div>'; }
+
+    var pct=Math.round(quiz.idx/total*100), isLast=quiz.idx===total-1;
+    var nextLabel=isLast?(quiz.mode==="exam"?"採点する ▶":"結果を見る ▶"):"次へ ▶";
+    var modeTag=quiz.source==="wrong"?'<span class="tag mode">間違い復習</span>':(quiz.source==="mark"?'<span class="tag mode mk">🚩 マーク復習</span>':'');
+    var marked=isMarked(q.id);
+    var markBtn='<button class="markbtn'+(marked?' on':'')+'" id="markBtn" title="自信がない問題に旗を立てる（M キー）">'+(marked?'🚩 マーク中':'🏳️ マーク')+'</button>';
+
+    app.innerHTML=
+    '<div class="card">'+
+      '<div class="pbar-wrap"><div class="pbar"><i style="width:'+pct+'%"></i></div><div class="pmeta">第 '+(quiz.idx+1)+' / '+total+' 問</div></div>'+
+      '<div class="qmeta">'+modeTag+'<span class="tag">'+esc(LABELS[q.domain]||q.domain)+'</span><span class="tag">#'+q.id+'</span><span class="spacer"></span>'+markBtn+'</div>'+
+      '<div class="qtext">'+esc(q.question)+'</div>'+
+      '<div class="opts" id="opts">'+optsHtml+'</div>'+expHtml+
+      '<div class="navbar"><button class="ghost" id="prevBtn" '+(quiz.idx===0?"disabled":"")+'>◀ 前へ</button>'+
+        '<button class="ghost" id="quitBtn">中断</button><div class="spacer"></div>'+
+        '<button class="cta" id="nextBtn" '+(canAdvance()?"":"disabled")+'>'+nextLabel+'</button></div>'+
+      '<div class="count-note">キーボード：<kbd>1</kbd>〜<kbd>'+q.options.length+'</kbd> で選択、<kbd>Enter</kbd> で次へ</div>'+
+    '</div>';
+
+    document.getElementById("opts").addEventListener("click", function(e){ var b=e.target.closest(".opt"); if(!b||b.disabled)return; selectOption(parseInt(b.dataset.i,10)); });
+    document.getElementById("prevBtn").addEventListener("click", function(){ if(quiz.idx>0){quiz.idx--;renderQ();window.scrollTo(0,0);} });
+    document.getElementById("nextBtn").addEventListener("click", advance);
+    document.getElementById("quitBtn").addEventListener("click", function(){ if(confirm("中断して設定画面に戻りますか？（この回の進捗は保存されません）")) renderStart(); });
+    document.getElementById("markBtn").addEventListener("click", function(){ toggleMark(q.id); renderQ(); });
+  }
+  function canAdvance(){ return quiz.mode==="exam"?true:quiz.answers[quiz.idx]!==null; }
+  function selectOption(i){ if(quiz.mode==="practice"&&quiz.answers[quiz.idx]!==null) return; quiz.answers[quiz.idx]=i; renderQ(); }
+  function advance(){ if(!canAdvance())return; if(quiz.idx<quiz.list.length-1){ quiz.idx++; renderQ(); window.scrollTo(0,0);} else finish(); }
+
+  document.addEventListener("keydown", function(e){
+    if(!quiz) return;
+    if(/^[1-6]$/.test(e.key)){ var i=parseInt(e.key,10)-1; var q=quiz.list[quiz.idx];
+      if(i<q.options.length){ var locked=quiz.mode==="practice"&&quiz.answers[quiz.idx]!==null; if(!locked) selectOption(i); } }
+    else if(e.key==="Enter"){ if(canAdvance()) advance(); }
+    else if(e.key==="m"||e.key==="M"){ toggleMark(quiz.list[quiz.idx].id); renderQ(); }
+    else if(e.key==="ArrowLeft"){ if(quiz.idx>0){quiz.idx--;renderQ();} }
+  });
+
+  // =========================================================================
+  // FINISH
+  // =========================================================================
+  function finish(){
+    var list=quiz.list, ans=quiz.answers, correct=0;
+    var wrong=lsGet(LS.wrong, []), mark=lsGet(LS.mark, []), st=getStats();
+    list.forEach(function(q,i){
+      var ok=ans[i]===q.answer;
+      var s=st[q.id]||{seen:0,correct:0}; s.seen++; if(ok) s.correct++; st[q.id]=s;   // per-question 集計
+      if(ok){ correct++; var p=wrong.indexOf(q.id); if(p>=0) wrong.splice(p,1); }
+      else {
+        if(wrong.indexOf(q.id)<0) wrong.push(q.id);
+        // 間違えたらマークは外す＝「マーク＆不正解」は間違い問題だけに入れる（二重計上しない）
+        var mp=mark.indexOf(q.id); if(mp>=0) mark.splice(mp,1);
+      }
+    });
+    lsSet(LS.stats, st); lsSet(LS.wrong, wrong); lsSet(LS.mark, mark);
+
+    // 受験ログ（分析用の attempts）を追記
+    var attempts=lsGet(LS.attempts, []); var base=Date.now();
+    list.forEach(function(q,i){
+      attempts.push({ ts:base+i*1000, sid:quiz.session||"app", mode:quiz.mode, source:quiz.source, qid:q.id, domain:q.domain, correct:(ans[i]===q.answer)?1:0 });
+    });
+    if(attempts.length>8000) attempts=attempts.slice(attempts.length-8000);
+    lsSet(LS.attempts, attempts);
+
+    var total=list.length, pct=Math.round(correct/total*100);
+    var hist=lsGet(LS.hist, []);
+    hist.unshift({ when:nowStr(), label:(quiz.source==="wrong"?"間違い復習":(quiz.source==="mark"?"マーク復習":(quiz.mode==="exam"?"試験":"練習"))), total:total, correct:correct, pct:pct });
+    if(hist.length>50) hist=hist.slice(0,50);
+    lsSet(LS.hist, hist);
+    renderResults(correct, total, pct);
+  }
+  function nowStr(){ var d=new Date(),z=function(n){return (n<10?"0":"")+n;};
+    return d.getFullYear()+"/"+z(d.getMonth()+1)+"/"+z(d.getDate())+" "+z(d.getHours())+":"+z(d.getMinutes()); }
+
+  function renderResults(correct,total,pct){
+    var list=quiz.list, ans=quiz.answers, pass=pct>=PASS_LINE, keys="ABCDEF";
+    var byDom={};
+    list.forEach(function(q,i){ if(!byDom[q.domain])byDom[q.domain]={c:0,t:0}; byDom[q.domain].t++; if(ans[i]===q.answer)byDom[q.domain].c++; });
+    var domRows=Object.keys(byDom).map(function(k){ var d=byDom[k],p=Math.round(d.c/d.t*100);
+      return '<tr><td>'+esc(LABELS[k]||k)+'<div class="minibar"><i style="width:'+p+'%;background:'+(p>=PASS_LINE?"var(--ok)":"var(--ng)")+'"></i></div></td><td class="n">'+d.c+' / '+d.t+'</td><td class="n">'+p+'%</td></tr>'; }).join("");
+
+    var wrongCount=0;
+    var reviewHtml=list.map(function(q,i){
+      var ok=ans[i]===q.answer; if(!ok) wrongCount++;
+      var mkBadge=isMarked(q.id)?' <span class="tag mk">🚩 マーク</span>':'';
+      var your=ans[i]===null?"（未回答）":keys[ans[i]]+". "+q.options[ans[i]];
+      return '<div class="review-item'+(ok?'':' ng')+'"><div class="q">'+(ok?"◯":"✕")+' #'+q.id+mkBadge+'　'+esc(q.question)+'</div>'+
+        (ok?'':'<div class="review-line your"><span class="lab">あなた</span><span>'+esc(your)+'</span></div>')+
+        '<div class="review-line ans"><span class="lab">正解</span><span>'+keys[q.answer]+'. '+esc(q.options[q.answer])+'</span></div>'+
+        '<div class="review-exp">'+esc(q.explanation)+
+        (q.concept?('<div class="concept"><span class="concept-label">📘 用語・ポイント</span>'+esc(q.concept)+'</div>'):'')+'</div></div>';
+    }).join("");
+
+    app.innerHTML=
+    '<div class="card"><div class="score-hero"><div class="score-num '+(pass?"pass":"fail")+'">'+pct+'%</div>'+
+      '<div class="score-sub">'+correct+' / '+total+' 問 正解'+(quiz.source==="wrong"?'（間違い復習）':(quiz.source==="mark"?'（マーク復習）':''))+'</div>'+
+      '<div class="verdict-pill '+(pass?"pass":"fail")+'">'+(pass?'合格ライン（'+PASS_LINE+'%）到達':'合格ライン（'+PASS_LINE+'%）未達')+'</div></div></div>'+
+    '<div class="card"><h2>ドメイン別スコア</h2><table class="dom"><thead><tr><th>ドメイン</th><th class="n">正答</th><th class="n">率</th></tr></thead><tbody>'+domRows+'</tbody></table></div>'+
+    '<div class="card"><div class="row">'+
+      '<button class="cta" id="retryAll">もう一度（同設定）</button>'+
+      (wrongCount?'<button class="ghost review" id="retryWrong">この回の間違い '+wrongCount+' 問を復習</button>':'')+
+      '<button class="ghost" id="listBtn2">問題一覧・成績</button>'+
+      '<button class="ghost" id="backHome">設定に戻る</button>'+
+    '</div><div class="count-note">間違えた問題は「間違い問題」に自動記録されます。🚩マークした問題は正解でも残り（間違えた場合は間違い問題に移動）、成績（出題/正解回数）も更新されます。</div></div>'+
+    '<div class="card"><h2>解答と解説（全'+total+'問）</h2><p class="lead">✕ が間違えた問題です。</p>'+reviewHtml+'</div>';
+
+    document.getElementById("retryAll").addEventListener("click", function(){ if(quiz.source==="wrong") startWrongReview(); else if(quiz.source==="mark") startMarkReview(); else startQuiz(); });
+    document.getElementById("backHome").addEventListener("click", renderStart);
+    document.getElementById("listBtn2").addEventListener("click", function(){ listFilter="all"; renderList(); });
+    var rw=document.getElementById("retryWrong");
+    if(rw) rw.addEventListener("click", function(){
+      var wl=[]; list.forEach(function(q,i){ if(ans[i]!==q.answer) wl.push(q); });
+      beginQuiz(orderList(wl), "wrong");
+    });
+    window.scrollTo(0,0);
+  }
+
+  renderStart();
+})();
+</script>
+</body>
+</html>
