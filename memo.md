@@ -104,3 +104,20 @@
 
 ## メモの育て方
 新しく「わからなかった点」が出たら、上の該当セクションに1行で要点を追記/上書き（同じ主題は1か所に集約）。過程や日付ログは残さず、完成形の要点だけにする。
+
+---
+
+## 苦手・要復習（2026-09-30・旧題庫アーカイブ時点の記録）
+- **【最重点・唯一2回間違い】run if の判定**：ALL_SUCCESS（全成功＝スキップも不可）／NONE_FAILED（失敗ゼロならOK＝スキップ許容）。「スキップを許すか」で見分ける。
+- 🚩**マーク**：自動スケーリング vs クラスタープール（運行中に worker 数が増減＝スケーリング／起動待ち短縮＝プール）。
+- 一度間違えた論点（1回目誤答→復習で正解。新題庫で再確認する）：
+  - CREATE DATABASE に `DELTA` キーワードは無い（`IF NOT EXISTS`＋`LOCATION`）
+  - COPY INTO 基本構文（`FROM '路径' FILEFORMAT=…`）／`mergeSchema` は **COPY_OPTIONS**
+  - spill / OOM の「最も効果が薄い・関係が薄い」＝性能と無関係な選択肢を選ぶ設問
+  - 一時ビューの作用域（TEMP＜GLOBAL TEMP＜VIEW）
+  - `OPTIMIZE … ZORDER BY`（TABLE 付けない・BY 必須）
+  - CDF 読み出し `table_changes`（時間トラベルとは別）
+  - 列マスク `ALTER COLUMN … SET MASK`（SET≠ADD）
+  - アクセスモード 共有/Standard（「サーバーレス」はアクセスモードではない）
+  - 集計 `count_distinct`（ユニーク数）
+  - 外部テーブル作成（`LOCATION` 明示・DROP してもファイルは残る）
